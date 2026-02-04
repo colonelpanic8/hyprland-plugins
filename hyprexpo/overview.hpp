@@ -10,6 +10,7 @@
 
 namespace Render {
     class IFramebuffer;
+    class ITexture;
 }
 
 // saves on resources, but is a bit broken rn with blur.
@@ -61,6 +62,8 @@ class COverview {
         int64_t                  workspaceID = -1;
         PHLWORKSPACE             pWorkspace;
         CBox                     box;
+        SP<Render::ITexture>     labelTex;
+        Vector2D                 labelSizePx;
     };
 
     Vector2D                     lastMousePosLocal = Vector2D{};
@@ -84,6 +87,7 @@ class COverview {
 
     bool                         swipe             = false;
     bool                         swipeWasCommenced = false;
+    bool                         showWorkspaceNumbers = false;
 
     friend class COverviewPassElement;
 };

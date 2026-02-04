@@ -1,5 +1,8 @@
 #include "overview.hpp"
 #include <any>
+#include <algorithm>
+#include <cmath>
+#include <pango/pangocairo.h>
 #define private public
 #define protected public
 #include <hyprland/src/render/Renderer.hpp>
@@ -28,6 +31,77 @@ static void clearCurrentRenderTarget(const CHyprColor& color) {
     g_pHyprRenderer->draw(CClearPassElement::SClearData{color});
 }
 
+static Vector2D renderLabelTexture(SP<Render::ITexture>& out, const std::string& text, const CHyprColor& color, int fontSizePx) {
+    if (text.empty() || fontSizePx <= 0)
+        return {};
+
+    auto measureSurface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, 1, 1);
+    auto measureCairo   = cairo_create(measureSurface);
+
+    PangoLayout*         measureLayout = pango_cairo_create_layout(measureCairo);
+    pango_layout_set_text(measureLayout, text.c_str(), -1);
+    auto* fontDesc = pango_font_description_from_string("Sans Bold");
+    pango_font_description_set_size(fontDesc, fontSizePx * PANGO_SCALE);
+    pango_layout_set_font_description(measureLayout, fontDesc);
+    pango_font_description_free(fontDesc);
+
+    PangoRectangle inkRect, logicalRect;
+    pango_layout_get_extents(measureLayout, &inkRect, &logicalRect);
+
+    const int textW = std::max(1, (int)std::ceil(logicalRect.width / (double)PANGO_SCALE));
+    const int textH = std::max(1, (int)std::ceil(logicalRect.height / (double)PANGO_SCALE));
+
+    g_object_unref(measureLayout);
+    cairo_destroy(measureCairo);
+    cairo_surface_destroy(measureSurface);
+
+    const int pad    = std::max(4, (int)std::round(fontSizePx * 0.35));
+    const int width  = textW + pad * 2;
+    const int height = textH + pad * 2;
+
+    auto surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, width, height);
+    auto cairo   = cairo_create(surface);
+
+    // Clear the pixmap
+    cairo_save(cairo);
+    cairo_set_operator(cairo, CAIRO_OPERATOR_CLEAR);
+    cairo_paint(cairo);
+    cairo_restore(cairo);
+
+    // Background for legibility
+    cairo_set_source_rgba(cairo, 0.0, 0.0, 0.0, 0.55);
+    cairo_rectangle(cairo, 0, 0, width, height);
+    cairo_fill(cairo);
+
+    PangoLayout* layout = pango_cairo_create_layout(cairo);
+    pango_layout_set_text(layout, text.c_str(), -1);
+    fontDesc = pango_font_description_from_string("Sans Bold");
+    pango_font_description_set_size(fontDesc, fontSizePx * PANGO_SCALE);
+    pango_layout_set_font_description(layout, fontDesc);
+    pango_font_description_free(fontDesc);
+
+    pango_layout_get_extents(layout, &inkRect, &logicalRect);
+    const double xOffset = (width - logicalRect.width / (double)PANGO_SCALE) / 2.0;
+    const double yOffset = (height - logicalRect.height / (double)PANGO_SCALE) / 2.0;
+
+    cairo_set_source_rgba(cairo, color.r, color.g, color.b, color.a);
+    cairo_move_to(cairo, xOffset, yOffset);
+    pango_cairo_show_layout(cairo, layout);
+
+    g_object_unref(layout);
+
+    cairo_surface_flush(surface);
+
+    out = g_pHyprRenderer->createTexture(surface);
+    out->setTexParameter(GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    out->setTexParameter(GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+
+    cairo_destroy(cairo);
+    cairo_surface_destroy(surface);
+
+    return {width, height};
+}
+
 static void damageMonitor(WP<Hyprutils::Animation::CBaseAnimatedVariable> thisptr) {
     g_pOverview->damage();
 }
@@ -46,11 +120,14 @@ COverview::COverview(PHLWORKSPACE startedOn_, bool swipe_) : startedOn(startedOn
     static auto* const* PGAPS    = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprexpo:gap_size")->getDataStaticPtr();
     static auto* const* PCOL     = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprexpo:bg_col")->getDataStaticPtr();
     static auto* const* PSKIP    = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprexpo:skip_empty")->getDataStaticPtr();
+    static auto* const* PSHOWNUM = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprexpo:show_workspace_numbers")->getDataStaticPtr();
+    static auto* const* PNUMCOL  = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprexpo:workspace_number_color")->getDataStaticPtr();
     static auto const*  PMETHOD  = (Hyprlang::STRING const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprexpo:workspace_method")->getDataStaticPtr();
 
     SIDE_LENGTH = **PCOLUMNS;
     GAP_WIDTH   = **PGAPS;
     BG_COLOR    = **PCOL;
+    showWorkspaceNumbers = **PSHOWNUM;
 
     // process the method
     bool     methodCenter  = true;
@@ -137,6 +214,17 @@ COverview::COverview(PHLWORKSPACE startedOn_, bool swipe_) : startedOn(startedOn
     Vector2D tileSize       = pMonitor->m_size / SIDE_LENGTH;
     Vector2D tileRenderSize = (pMonitor->m_size - Vector2D{GAP_WIDTH * pMonitor->m_scale, GAP_WIDTH * pMonitor->m_scale} * (SIDE_LENGTH - 1)) / SIDE_LENGTH;
     CBox     monbox{0, 0, tileSize.x * 2, tileSize.y * 2};
+
+    if (showWorkspaceNumbers) {
+        const CHyprColor numberColor = **PNUMCOL;
+        const int        fontSizePx  = std::max(12, (int)std::round(tileRenderSize.y * pMonitor->m_scale * 0.22));
+        for (auto& image : images) {
+            if (image.workspaceID == WORKSPACE_INVALID)
+                continue;
+            image.labelTex = makeShared<CTexture>();
+            image.labelSizePx = renderLabelTexture(image.labelTex, std::to_string(image.workspaceID), numberColor, fontSizePx);
+        }
+    }
 
     if (!ENABLE_LOWRES)
         monbox = {{0, 0}, pMonitor->m_pixelSize};
@@ -470,6 +558,18 @@ void COverview::fullRender() {
             CRegion damage{0, 0, INT16_MAX, INT16_MAX};
             if (images[x + y * SIDE_LENGTH].fb)
                 g_pHyprOpenGL->renderTextureInternal(images[x + y * SIDE_LENGTH].fb->getTexture(), texbox, {.damage = &damage, .a = 1.0});
+
+            if (showWorkspaceNumbers) {
+                auto& image = images[x + y * SIDE_LENGTH];
+                if (image.workspaceID != WORKSPACE_INVALID && image.labelTex && image.labelTex->m_texID != 0 && image.labelSizePx.x > 0 && image.labelSizePx.y > 0) {
+                    const Vector2D labelSize = image.labelSizePx / pMonitor->m_scale;
+                    const float    margin    = std::max(4.0, tileRenderSize.y * 0.05);
+                    CBox           labelBox  = {x * tileRenderSize.x + x * GAPSIZE + margin, y * tileRenderSize.y + y * GAPSIZE + margin, labelSize.x, labelSize.y};
+                    labelBox.scale(pMonitor->m_scale).translate(pos->value());
+                    labelBox.round();
+                    g_pHyprOpenGL->renderTextureInternal(image.labelTex, labelBox, {.damage = &damage, .a = 1.0});
+                }
+            }
         }
     }
 }
