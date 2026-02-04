@@ -8,6 +8,7 @@
 #include <hyprland/src/helpers/AnimatedVariable.hpp>
 #include <hyprland/src/managers/HookSystemManager.hpp>
 #include <vector>
+class CTexture;
 
 // saves on resources, but is a bit broken rn with blur.
 // hyprland's fault, but cba to fix.
@@ -58,6 +59,8 @@ class COverview {
         int64_t      workspaceID = -1;
         PHLWORKSPACE pWorkspace;
         CBox         box;
+        SP<CTexture> labelTex;
+        Vector2D     labelSizePx;
     };
 
     Vector2D                     lastMousePosLocal = Vector2D{};
@@ -81,6 +84,7 @@ class COverview {
 
     bool                         swipe             = false;
     bool                         swipeWasCommenced = false;
+    bool                         showWorkspaceNumbers = false;
 
     friend class COverviewPassElement;
 };
