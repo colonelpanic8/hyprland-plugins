@@ -55,6 +55,7 @@ Here are a list of options you can use:
 | --- | --- |
 toggle | displays if hidden, hide if displayed
 select | selects the hovered desktop
+bring | brings a window from the hovered desktop to the current desktop
 off | hides the overview
 disable | same as `off`
 on | displays the overview
