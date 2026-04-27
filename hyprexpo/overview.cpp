@@ -221,7 +221,6 @@ COverview::COverview(PHLWORKSPACE startedOn_, bool swipe_) : startedOn(startedOn
         for (auto& image : images) {
             if (image.workspaceID == WORKSPACE_INVALID)
                 continue;
-            image.labelTex = makeShared<CTexture>();
             image.labelSizePx = renderLabelTexture(image.labelTex, std::to_string(image.workspaceID), numberColor, fontSizePx);
         }
     }

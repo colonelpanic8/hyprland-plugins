@@ -104,7 +104,7 @@ static SDispatchResult bringWindowFromWorkspace(int64_t sourceWorkspaceID) {
         return {.success = false, .error = "selected workspace has no mapped windows"};
 
     g_pCompositor->moveWindowToWorkspaceSafe(WINDOW, MONITOR->m_activeWorkspace);
-    FOCUSSTATE->fullWindowFocus(WINDOW);
+    FOCUSSTATE->fullWindowFocus(WINDOW, Desktop::FOCUS_REASON_KEYBIND);
     g_pCompositor->warpCursorTo(WINDOW->middle());
     return {};
 }
