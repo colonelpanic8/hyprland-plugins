@@ -4,10 +4,13 @@
 
 #include "globals.hpp"
 #include <hyprland/src/desktop/DesktopTypes.hpp>
-#include <hyprland/src/render/Framebuffer.hpp>
 #include <hyprland/src/helpers/AnimatedVariable.hpp>
 #include <hyprland/src/event/EventBus.hpp>
 #include <vector>
+
+namespace Render {
+    class IFramebuffer;
+}
 
 // saves on resources, but is a bit broken rn with blur.
 // hyprland's fault, but cba to fix.
@@ -54,10 +57,10 @@ class COverview {
     bool       damageDirty = false;
 
     struct SWorkspaceImage {
-        CFramebuffer fb;
-        int64_t      workspaceID = -1;
-        PHLWORKSPACE pWorkspace;
-        CBox         box;
+        SP<Render::IFramebuffer> fb;
+        int64_t                  workspaceID = -1;
+        PHLWORKSPACE             pWorkspace;
+        CBox                     box;
     };
 
     Vector2D                     lastMousePosLocal = Vector2D{};

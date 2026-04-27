@@ -17,4 +17,7 @@ class COverviewPassElement : public IPassElement {
     virtual const char*         passName() {
         return "COverviewPassElement";
     }
+    virtual ePassElementType    type() {
+        return EK_CUSTOM;
+    }
 };
