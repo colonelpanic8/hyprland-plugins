@@ -1,11 +1,17 @@
 #define WLR_USE_UNSTABLE
 
+#include <format>
+#include <stdexcept>
 #include <unistd.h>
+#include <vector>
 
 #include <hyprland/src/Compositor.hpp>
 #include <hyprland/src/desktop/state/FocusState.hpp>
 #include <hyprland/src/desktop/view/Window.hpp>
 #include <hyprland/src/config/ConfigManager.hpp>
+#include <hyprland/src/config/values/types/ColorValue.hpp>
+#include <hyprland/src/config/values/types/IntValue.hpp>
+#include <hyprland/src/config/values/types/StringValue.hpp>
 #include <hyprland/src/desktop/DesktopTypes.hpp>
 #include <hyprland/src/render/Renderer.hpp>
 #include <hyprland/src/managers/input/trackpad/GestureTypes.hpp>
@@ -28,6 +34,13 @@ typedef void (*origAddDamageA)(void*, const CBox&);
 typedef void (*origAddDamageB)(void*, const pixman_region32_t*);
 
 static bool g_unloading = false;
+static std::vector<SP<Config::Values::IValue>> g_configValues;
+
+static void addHyprexpoConfigValue(SP<Config::Values::IValue> value) {
+    g_configValues.emplace_back(value);
+    if (!HyprlandAPI::addConfigValueV2(PHANDLE, value))
+        throw std::runtime_error(std::format("[he] failed to register config value {}", value->name()));
+}
 
 // Do NOT change this function.
 APICALL EXPORT std::string PLUGIN_API_VERSION() {
@@ -295,15 +308,31 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
 
     HyprlandAPI::addConfigKeyword(PHANDLE, KEYWORD_EXPO_GESTURE, ::expoGestureKeyword, {true});
 
-    HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:columns", Hyprlang::INT{3});
-    HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:gap_size", Hyprlang::INT{5});
-    HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:bg_col", Hyprlang::INT{0xFF111111});
-    HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:workspace_method", Hyprlang::STRING{"center current"});
-    HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:skip_empty", Hyprlang::INT{0});
-    HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:show_workspace_numbers", Hyprlang::INT{0});
-    HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:workspace_number_color", Hyprlang::INT{0xFFFFFFFF});
+    #define CONF_INT(NAME, VALUE)                                                                      \
+        addHyprexpoConfigValue(makeShared<Config::Values::CIntValue>(                                  \
+            "plugin:hyprexpo:" NAME, "hyprexpo plugin option", static_cast<Config::INTEGER>(VALUE)   \
+        ))
+    #define CONF_COLOR(NAME, VALUE)                                                                    \
+        addHyprexpoConfigValue(makeShared<Config::Values::CColorValue>(                                \
+            "plugin:hyprexpo:" NAME, "hyprexpo plugin option", static_cast<Config::INTEGER>(VALUE)   \
+        ))
+    #define CONF_STRING(NAME, VALUE)                                                                   \
+        addHyprexpoConfigValue(makeShared<Config::Values::CStringValue>(                               \
+            "plugin:hyprexpo:" NAME, "hyprexpo plugin option", static_cast<Config::STRING>(VALUE)    \
+        ))
 
-    HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:gesture_distance", Hyprlang::INT{200});
+    CONF_INT("columns", 3);
+    CONF_INT("gap_size", 5);
+    CONF_COLOR("bg_col", 0xFF111111);
+    CONF_STRING("workspace_method", "center current");
+    CONF_INT("skip_empty", 0);
+    CONF_INT("show_workspace_numbers", 0);
+    CONF_COLOR("workspace_number_color", 0xFFFFFFFF);
+    CONF_INT("gesture_distance", 200);
+
+    #undef CONF_INT
+    #undef CONF_COLOR
+    #undef CONF_STRING
 
     HyprlandAPI::reloadConfig();
 
