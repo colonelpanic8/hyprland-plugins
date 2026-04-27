@@ -116,18 +116,18 @@ COverview::COverview(PHLWORKSPACE startedOn_, bool swipe_) : startedOn(startedOn
     const auto PMONITOR = Desktop::focusState()->monitor();
     pMonitor            = PMONITOR;
 
-    static auto* const* PCOLUMNS = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprexpo:columns")->getDataStaticPtr();
-    static auto* const* PGAPS    = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprexpo:gap_size")->getDataStaticPtr();
-    static auto* const* PCOL     = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprexpo:bg_col")->getDataStaticPtr();
-    static auto* const* PSKIP    = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprexpo:skip_empty")->getDataStaticPtr();
-    static auto* const* PSHOWNUM = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprexpo:show_workspace_numbers")->getDataStaticPtr();
-    static auto* const* PNUMCOL  = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprexpo:workspace_number_color")->getDataStaticPtr();
-    static auto const*  PMETHOD  = (Hyprlang::STRING const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprexpo:workspace_method")->getDataStaticPtr();
+    static auto PCOLUMNS = CConfigValue<Config::INTEGER>("plugin:hyprexpo:columns");
+    static auto PGAPS    = CConfigValue<Config::INTEGER>("plugin:hyprexpo:gap_size");
+    static auto PCOL     = CConfigValue<Config::INTEGER>("plugin:hyprexpo:bg_col");
+    static auto PSKIP    = CConfigValue<Config::INTEGER>("plugin:hyprexpo:skip_empty");
+    static auto PSHOWNUM = CConfigValue<Config::INTEGER>("plugin:hyprexpo:show_workspace_numbers");
+    static auto PNUMCOL  = CConfigValue<Config::INTEGER>("plugin:hyprexpo:workspace_number_color");
+    static auto PMETHOD  = CConfigValue<std::string>("plugin:hyprexpo:workspace_method");
 
-    SIDE_LENGTH = **PCOLUMNS;
-    GAP_WIDTH   = **PGAPS;
-    BG_COLOR    = **PCOL;
-    showWorkspaceNumbers = **PSHOWNUM;
+    SIDE_LENGTH = *PCOLUMNS;
+    GAP_WIDTH   = *PGAPS;
+    BG_COLOR    = *PCOL;
+    showWorkspaceNumbers = *PSHOWNUM;
 
     // process the method
     bool     methodCenter  = true;
@@ -145,7 +145,7 @@ COverview::COverview(PHLWORKSPACE startedOn_, bool swipe_) : startedOn(startedOn
     images.resize(SIDE_LENGTH * SIDE_LENGTH);
 
     // r includes empty workspaces; m skips over them
-    std::string selector = **PSKIP ? "m" : "r";
+    std::string selector = *PSKIP ? "m" : "r";
 
     if (methodCenter) {
         int currentID = methodStartID;
@@ -216,7 +216,7 @@ COverview::COverview(PHLWORKSPACE startedOn_, bool swipe_) : startedOn(startedOn
     CBox     monbox{0, 0, tileSize.x * 2, tileSize.y * 2};
 
     if (showWorkspaceNumbers) {
-        const CHyprColor numberColor = **PNUMCOL;
+        const CHyprColor numberColor = *PNUMCOL;
         const int        fontSizePx  = std::max(12, (int)std::round(tileRenderSize.y * pMonitor->m_scale * 0.22));
         for (auto& image : images) {
             if (image.workspaceID == WORKSPACE_INVALID)
@@ -600,9 +600,9 @@ void COverview::resetSwipe() {
 void COverview::onSwipeUpdate(double delta) {
     m_isSwiping = true;
 
-    static auto* const* PDISTANCE = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprexpo:gesture_distance")->getDataStaticPtr();
+    static auto PDISTANCE = CConfigValue<Config::INTEGER>("plugin:hyprexpo:gesture_distance");
 
-    const float         PERC               = closing ? std::clamp(delta / (double)**PDISTANCE, 0.0, 1.0) : 1.0 - std::clamp(delta / (double)**PDISTANCE, 0.0, 1.0);
+    const float         PERC               = closing ? std::clamp(delta / (double)*PDISTANCE, 0.0, 1.0) : 1.0 - std::clamp(delta / (double)*PDISTANCE, 0.0, 1.0);
     const auto          WORKSPACE_FOCUS_ID = closing && closeOnID != -1 ? closeOnID : openedID;
 
     Vector2D            tileSize = (pMonitor->m_size / SIDE_LENGTH);
