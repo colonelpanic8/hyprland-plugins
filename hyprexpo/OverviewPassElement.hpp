@@ -13,8 +13,11 @@ class COverviewPassElement : public IPassElement {
     virtual bool                needsPrecomputeBlur();
     virtual std::optional<CBox> boundingBox();
     virtual CRegion             opaqueRegion();
+    virtual ePassElementType    type() {
+        return EK_CUSTOM;
+    }
 
-    virtual const char*         passName() {
+    virtual const char* passName() {
         return "COverviewPassElement";
     }
 };
